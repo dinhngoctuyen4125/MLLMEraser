@@ -45,6 +45,15 @@ def load_json(path, limit=None):
     return data
 
 
+def build_prompt(code_context):
+    prompt_text = (
+        f"Complete and output the next line for the following Python function:\n"
+        f"```python\n"
+        f"{code_context}"
+    )
+    return prompt_text
+
+
 # ------------------------------------------------------- hidden extraction
 
 class HiddenExtractor:
@@ -85,7 +94,7 @@ class HiddenExtractor:
 
 def build_steer_vector(ex, data, layer, batch_size, gate_train_input):
     """v_steer = v_rep - v_dep, and the pair of activation banks the gate trains on."""
-    probes = [r["probing input"] for r in data]
+    probes = [build_prompt(r["probing input"]) for r in data]
     h_neg = ex.last_token([p + r["y_neg"] for p, r in zip(probes, data)], layer, batch_size)
     h_pos = ex.last_token([p + r["y_pos"] for p, r in zip(probes, data)], layer, batch_size)
 
@@ -192,7 +201,7 @@ def evaluate(model, tok, data, device, args, tag):
     for i in tqdm(range(0, len(data), args.gen_bs), desc=f"gen [{tag}]"):
         batch = data[i : i + args.gen_bs]
         enc = tok(
-            [r["probing input"] for r in batch],
+            [build_prompt(r["probing input"]) for r in batch],
             padding=True,
             truncation=True,
             max_length=args.max_len,
@@ -230,7 +239,7 @@ def evaluate(model, tok, data, device, args, tag):
 
 def parse_args():
     p = argparse.ArgumentParser(description="Soft-weight steering for code API unlearning.")
-    p.add_argument("--model_id", default="deepseek-ai/deepseek-coder-1.3b-base")
+    p.add_argument("--model_id", default="deepseek-ai/deepseek-coder-1.3b-instruct")
     p.add_argument("--data_dir", default="data/deepseek")
     p.add_argument("--out_dir", default="results")
     p.add_argument("--layer", type=int, default=12, help="decoder block to steer (0-indexed)")

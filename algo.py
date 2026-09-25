@@ -211,7 +211,14 @@ def evaluate(model, tok, data, device, args, tag):
             rep_hits += r
             dep_hits += d
             if len(samples) < args.n_dump:
-                samples.append({"expected": rec["expected call"], "rep": r, "dep": d, "gen": text})
+                samples.append({
+                    "function": rec["function"],
+                    "probing input": rec["probing input"],
+                    "expected": rec["expected call"],
+                    "rep": r,
+                    "dep": d,
+                    "generate": text,
+                })
 
     n = len(data)
     res = {"n": n, "repAPI": rep_hits / n, "depAPI": dep_hits / n}

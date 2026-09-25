@@ -82,9 +82,12 @@ class HiddenExtractor:
                 max_length=self.max_len,
                 return_tensors="pt",
             ).to(self.device)
-            hs = self.model(**enc, output_hidden_states=True).hidden_states
+            # Extraction needs decoder activations, not vocabulary logits or a KV cache.
+            hs = self.model.model(
+                **enc, output_hidden_states=True, use_cache=False
+            ).hidden_states
             out.append(hs[layer + 1][:, -1, :].detach().float().cpu())
-            torch.cuda.empty_cache()
+            del hs
         h = torch.cat(out, dim=0)
         logger.info(f"H shape: {tuple(h.shape)}")
         return h
@@ -161,6 +164,7 @@ class SteeringHook:
     def __init__(self, gate, v_steer, strength):
         self.gate, self.v, self.t = gate, v_steer, strength
         self.enabled = False
+        self.last_a = None  # First prompt-pass coefficients; reset for every generate batch.
 
     def __call__(self, module, args, output):
         is_tuple = isinstance(output, tuple)
@@ -169,6 +173,8 @@ class SteeringHook:
             return output
         with torch.no_grad():
             a = self.gate(hs[:, -1, :].float())              # [B, 1]
+            if self.last_a is None:
+                self.last_a = a.detach().flatten()
             delta = (self.t * a * self.v).unsqueeze(1)       # [B, 1, d]
         hs = hs + delta.to(hs.dtype)
         return (hs,) + output[1:] if is_tuple else hs
@@ -195,9 +201,10 @@ def api_patterns(rec):
 
 
 @torch.no_grad()
-def evaluate(model, tok, data, device, args, tag):
+def evaluate(model, tok, data, device, args, tag, hook):
     rep_hits = dep_hits = 0
     samples = []
+    gate_scores = []
     for i in tqdm(range(0, len(data), args.gen_bs), desc=f"gen [{tag}]"):
         batch = data[i : i + args.gen_bs]
         enc = tok(
@@ -207,21 +214,35 @@ def evaluate(model, tok, data, device, args, tag):
             max_length=args.max_len,
             return_tensors="pt",
         ).to(device)
+        hook.last_a = None  # Prevent coefficients leaking between batches or modes.
         out = model.generate(
             **enc, max_new_tokens=args.max_new_tokens, do_sample=False, pad_token_id=tok.pad_token_id
         )
         # [MLLMEraser: MLLMU_eval_steering.py:118-119]
         out = out[:, enc.input_ids.shape[-1] :]
-        for rec, ids in zip(batch, out):
+        a_values = (
+            hook.last_a.cpu().tolist() if hook.last_a is not None else [None] * len(batch)
+        )
+        for offset, (rec, ids, a) in enumerate(zip(batch, out, a_values)):
             text = tok.decode(ids, skip_special_tokens=True)
             rep_pat, dep_pat = api_patterns(rec)
             r = any(p.search(text) for p in rep_pat)
             d = any(p.search(text) for p in dep_pat)
             rep_hits += r
             dep_hits += d
+            score = {
+                "sample_index": i + offset,
+                "id": rec.get("id"),
+                "function": rec["function"],
+                "a": a,
+                "steering_scale": a * hook.t if a is not None else 0.0,
+                "rep": r,
+                "dep": d,
+            }
+            gate_scores.append(score)
             if len(samples) < args.n_dump:
                 samples.append({
-                    "function": rec["function"],
+                    **score,
                     "probing input": rec["probing input"],
                     "expected": rec["expected call"],
                     "rep": r,
@@ -241,7 +262,7 @@ def evaluate(model, tok, data, device, args, tag):
         f"[{tag}] n={n}  repAPI={rep_hits}/{n} ({res['repAPI']:.3f})  "
         f"depAPI={dep_hits}/{n} ({res['depAPI']:.3f})"
     )
-    return res, samples
+    return res, samples, gate_scores
 
 
 # ------------------------------------------------------------------ main
@@ -309,20 +330,26 @@ def main():
 
     results = {"args": vars(args)}
     dumps = {}
+    scores = {}
     for name in ["D_test_U_dep", "D_test_U_nondep"]:
         test = load_json(os.path.join(args.data_dir, f"{name}.json"), args.max_test)
         for tag, on in [("baseline", False), ("steered", True)]:
             hook.enabled = on
-            res, samples = evaluate(model, tok, test, device, args, f"{name}/{tag}")
+            res, samples, gate_scores = evaluate(
+                model, tok, test, device, args, f"{name}/{tag}", hook
+            )
             results[f"{name}/{tag}"] = res
             dumps[f"{name}/{tag}"] = samples
+            scores[f"{name}/{tag}"] = gate_scores
     handle.remove()
 
     with open(os.path.join(args.out_dir, "results.json"), "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2)
     with open(os.path.join(args.out_dir, "samples.json"), "w", encoding="utf-8") as f:
         json.dump(dumps, f, indent=2)
-    logger.info(f"wrote {args.out_dir}/results.json")
+    with open(os.path.join(args.out_dir, "gate_scores.json"), "w", encoding="utf-8") as f:
+        json.dump(scores, f, indent=2, ensure_ascii=False)
+    logger.info(f"wrote {args.out_dir}/results.json, samples.json and gate_scores.json")
 
 
 if __name__ == "__main__":

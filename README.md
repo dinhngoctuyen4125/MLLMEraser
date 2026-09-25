@@ -21,6 +21,31 @@ mkdir -p logs
 nohup bash run_script.sh > ./logs/algo.log 2>&1 &
 ```
 
+## Tăng tốc trên server
+
+`run_script.sh` mặc định dùng `EXTRACT_BS=32` và `GEN_BS=32` (thay cho 8).
+Có thể tăng độc lập hai batch size khi GPU còn đủ VRAM:
+
+```bash
+EXTRACT_BS=32 GEN_BS=32 bash run_script.sh
+# Thử 64 và so sánh thời gian trên cùng số mẫu:
+EXTRACT_BS=64 GEN_BS=64 bash run_script.sh
+```
+
+Nếu thiếu VRAM, giảm batch size của bước đang chạy. Batch lớn hơn không bảo đảm
+nhanh hơn; so sánh thời gian thực tế, nhất là khi GPU đang dùng chung với tiến trình khác.
+Hai lệnh trên dùng cùng thư mục kết quả mặc định; sao lưu kết quả cần giữ trước khi chạy lại.
+Batch train gate vẫn là 64 để giữ nguyên số bước cập nhật.
+
+Script tôn trọng `CUDA_VISIBLE_DEVICES` có sẵn từ shell/Slurm; nếu chưa đặt thì dùng GPU 0.
+Ví dụ `CUDA_VISIBLE_DEVICES=1 EXTRACT_BS=32 GEN_BS=32 bash run_script.sh` để chọn GPU 1
+khi GPU đó được phép sử dụng. Một lần chạy vẫn dùng một GPU.
+
+Extraction gọi trực tiếp decoder (`model.model`), bỏ tính vocabulary logits và tắt
+KV cache chỉ trong bước này. Không gọi `empty_cache()` mỗi batch để PyTorch tái sử dụng
+bộ nhớ đã cấp phát; giải phóng tham chiếu hidden states trước batch kế tiếp.
+Generation vẫn dùng cache theo cấu hình model; prompt, loss, steering và metric giữ nguyên.
+
 ---
 
 ## Pipeline
@@ -74,7 +99,8 @@ Một lần chạy `algo.py` đi qua 6 stage tuần tự. Tất cả nằm trong
 
 1. Ghép text: `x + y_neg` và `x + y_pos` (`x` = trường `probing input`)
 2. Hai lượt extract qua [`HiddenExtractor.last_token`](algo.py#L65-L81):
-   forward theo batch với `output_hidden_states=True`, lấy `hidden_states[L+1][:, -1, :]`
+   forward decoder theo batch với `output_hidden_states=True, use_cache=False`,
+   lấy `hidden_states[L+1][:, -1, :]`; không chạy LM head
 3. `v_steer = h_pos.mean(0) - h_neg.mean(0)`
 
 > `hidden_states[i]` là **input** của block `i`, nên `L+1` mới là **output** của block `L` —
@@ -137,7 +163,7 @@ Mỗi mẫu: chỉ lấy `probing input` → greedy generate 48 token → cắt 
   `replacement api`
 - **depAPI hit** — dotted-suffix của mỗi `deprecated api`, cộng các short alias từ `alias dict`
 
-Tổng: 800 generation (100 batch ở `--gen_bs 8`).
+Tổng: 800 generation (28 batch ở `--gen_bs 32`, mặc định trong script).
 
 ### Stage 6 — Ghi kết quả — [`main():294-300`](algo.py#L294-L300)
 
@@ -146,13 +172,21 @@ Tổng: 800 generation (100 batch ở `--gen_bs 8`).
 | File | Nội dung |
 |---|---|
 | `results.json` | toàn bộ `args` + `{n, repAPI_count, depAPI_count, repAPI, depAPI}` cho cả 4 tổ hợp tập × mode |
-| `samples.json` | 20 generation đầu mỗi tổ hợp, để mắt thường kiểm tra |
+| `samples.json` | 20 generation đầu mỗi tổ hợp, kèm `a` và `steering_scale` |
+| `gate_scores.json` | Hệ số gate của toàn bộ mẫu đã infer trong từng tập × mode, không giới hạn bởi `--n_dump` |
 | `v_steer.pt` | `[2048]` float32 |
 | `gate.pt` | `state_dict` của MLP |
 
 `repAPI_count` và `depAPI_count` là số mẫu có API tương ứng trên tổng `n` mẫu;
 `repAPI` và `depAPI` giữ tỷ lệ (count / n). Ví dụ `repAPI_count: 17`, `n: 200`
 nghĩa là 17/200 mẫu. Một mẫu có thể được tính vào cả hai nhóm nếu sinh cả hai API.
+
+Trong `gate_scores.json`, mỗi record có `sample_index` (đánh số từ 0 trong tập test),
+`id` nếu dữ liệu có, `function`, `a`, `steering_scale`, `rep` và `dep`.
+`a` được lấy ngay từ hook trong lượt xử lý prompt đầu tiên; `steering_scale = a * t`.
+Baseline không chạy gate nên `a: null` và `steering_scale: 0.0`. Nếu hook không can thiệp
+(ví dụ prompt chỉ có một token), hai trường cũng có giá trị như vậy. Giá trị JSON
+giữ độ chính xác của tensor, không làm tròn thành ba chữ số như log train.
 
 Con số cần đọc là **delta giữa `baseline` và `steered`**: repAPI phải tăng, depAPI phải giảm,
 trên **cả hai** tập test.
@@ -161,7 +195,8 @@ trên **cả hai** tập test.
 
 ## Tuning
 
-`run_script.sh` nhận 3 env var, mỗi lần chạy ghi vào thư mục riêng
+`run_script.sh` nhận `LAYER`, `STRENGTH`, `GATE_INPUT`, `EXTRACT_BS`, `GEN_BS` và
+`CUDA_VISIBLE_DEVICES`; mỗi lần chạy ghi vào thư mục riêng
 `results/L{layer}_t{strength}_{gate_input}/`:
 
 ```bash

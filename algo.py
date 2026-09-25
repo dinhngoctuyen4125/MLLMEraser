@@ -230,8 +230,17 @@ def evaluate(model, tok, data, device, args, tag):
                 })
 
     n = len(data)
-    res = {"n": n, "repAPI": rep_hits / n, "depAPI": dep_hits / n}
-    logger.info(f"[{tag}] n={n}  repAPI={res['repAPI']:.3f}  depAPI={res['depAPI']:.3f}")
+    res = {
+        "n": n,
+        "repAPI_count": rep_hits,
+        "depAPI_count": dep_hits,
+        "repAPI": rep_hits / n,
+        "depAPI": dep_hits / n,
+    }
+    logger.info(
+        f"[{tag}] n={n}  repAPI={rep_hits}/{n} ({res['repAPI']:.3f})  "
+        f"depAPI={dep_hits}/{n} ({res['depAPI']:.3f})"
+    )
     return res, samples
 
 

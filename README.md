@@ -145,10 +145,14 @@ Tổng: 800 generation (100 batch ở `--gen_bs 8`).
 
 | File | Nội dung |
 |---|---|
-| `results.json` | toàn bộ `args` + `{n, repAPI, depAPI}` cho cả 4 tổ hợp tập × mode |
+| `results.json` | toàn bộ `args` + `{n, repAPI_count, depAPI_count, repAPI, depAPI}` cho cả 4 tổ hợp tập × mode |
 | `samples.json` | 20 generation đầu mỗi tổ hợp, để mắt thường kiểm tra |
 | `v_steer.pt` | `[2048]` float32 |
 | `gate.pt` | `state_dict` của MLP |
+
+`repAPI_count` và `depAPI_count` là số mẫu có API tương ứng trên tổng `n` mẫu;
+`repAPI` và `depAPI` giữ tỷ lệ (count / n). Ví dụ `repAPI_count: 17`, `n: 200`
+nghĩa là 17/200 mẫu. Một mẫu có thể được tính vào cả hai nhóm nếu sinh cả hai API.
 
 Con số cần đọc là **delta giữa `baseline` và `steered`**: repAPI phải tăng, depAPI phải giảm,
 trên **cả hai** tập test.

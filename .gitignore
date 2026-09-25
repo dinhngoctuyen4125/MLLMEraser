@@ -9,7 +9,7 @@ env/
 # Run outputs
 # logs/
 # results/
-*.log
+# *.log
 slurm-*.out
 output_*.log
 error_*.log

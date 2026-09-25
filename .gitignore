@@ -7,7 +7,7 @@ venv/
 env/
 
 # Run outputs
-logs/
+# logs/
 results/
 *.log
 slurm-*.out

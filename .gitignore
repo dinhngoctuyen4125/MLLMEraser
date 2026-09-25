@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Run outputs
+logs/
+results/
+*.log
+slurm-*.out
+output_*.log
+error_*.log
+
+# Artifacts produced by algo.py
+*.pt
+*.pkl
+
+# Model / dataset caches
+.cache/
+hf_cache/
+*.safetensors
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+data/

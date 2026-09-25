@@ -5,12 +5,14 @@ tại **test time**, bằng activation steering. Không update weight của mode
 
 Chi tiết thuật toán và các quyết định thiết kế: [PLAN.md](PLAN.md).
 
-## Installation
+## Setup
 
 ```bash
 conda create -n mllme python=3.10
 conda activate mllme
 pip install -r requirements.txt
+
+mkdir -p logs
 ```
 
 ## Run

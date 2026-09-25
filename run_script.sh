@@ -21,7 +21,7 @@ GATE_INPUT=${GATE_INPUT:-neg}
 
 python algo.py \
   --model_id deepseek-ai/deepseek-coder-1.3b-base \
-  --data_dir data/deepseek \
+  --data_dir ../Data-Collection/deepseek \
   --out_dir "results/L${LAYER}_t${STRENGTH}_${GATE_INPUT}" \
   --layer "$LAYER" \
   --strength "$STRENGTH" \

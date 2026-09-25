@@ -258,7 +258,7 @@ def parse_args():
     p.add_argument("--max_test", type=int, default=200)
     p.add_argument("--max_len", type=int, default=1024)
     p.add_argument("--max_new_tokens", type=int, default=48)
-    p.add_argument("--extract_bs", type=int, default=32)
+    p.add_argument("--extract_bs", type=int, default=16)
     p.add_argument("--gen_bs", type=int, default=8)
     p.add_argument("--gate_bs", type=int, default=64)
     p.add_argument("--gate_hidden", type=int, default=256)

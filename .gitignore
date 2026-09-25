@@ -8,7 +8,7 @@ env/
 
 # Run outputs
 # logs/
-results/
+# results/
 *.log
 slurm-*.out
 output_*.log

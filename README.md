@@ -172,7 +172,7 @@ Tổng: 800 generation (28 batch ở `--gen_bs 32`, mặc định trong script).
 | File | Nội dung |
 |---|---|
 | `results.json` | toàn bộ `args` + `{n, repAPI_count, depAPI_count, repAPI, depAPI}` cho cả 4 tổ hợp tập × mode |
-| `samples.json` | 20 generation đầu mỗi tổ hợp, kèm `a` và `steering_scale` |
+| `samples.json` | Tối đa 200 generation mỗi tổ hợp (mặc định `--n_dump 200`), kèm `a` và `steering_scale` |
 | `gate_scores.json` | Hệ số gate của toàn bộ mẫu đã infer trong từng tập × mode, không giới hạn bởi `--n_dump` |
 | `v_steer.pt` | `[2048]` float32 |
 | `gate.pt` | `state_dict` của MLP |

@@ -285,7 +285,7 @@ def parse_args():
     p.add_argument("--gate_hidden", type=int, default=256)
     p.add_argument("--epochs", type=int, default=10)
     p.add_argument("--lr", type=float, default=1e-3)
-    p.add_argument("--n_dump", type=int, default=20)
+    p.add_argument("--n_dump", type=int, default=200)
     p.add_argument("--seed", type=int, default=42)
     return p.parse_args()
 

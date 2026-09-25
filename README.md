@@ -171,21 +171,23 @@ Tổng: 800 generation (28 batch ở `--gen_bs 32`, mặc định trong script).
 
 | File | Nội dung |
 |---|---|
-| `results.json` | toàn bộ `args` + `{n, repAPI_count, depAPI_count, repAPI, depAPI}` cho cả 4 tổ hợp tập × mode |
-| `samples.json` | Tối đa 200 generation mỗi tổ hợp (mặc định `--n_dump 200`), kèm `a` và `steering_scale` |
+| `results.json` | toàn bộ `args` + `{n, repAPI, depAPI}` cho cả 4 tổ hợp tập × mode |
+| `samples.json` | Tối đa 200 generation mỗi tổ hợp (mặc định `--n_dump 200`), kèm `a` |
 | `gate_scores.json` | Hệ số gate của toàn bộ mẫu đã infer trong từng tập × mode, không giới hạn bởi `--n_dump` |
 | `v_steer.pt` | `[2048]` float32 |
 | `gate.pt` | `state_dict` của MLP |
 
-`repAPI_count` và `depAPI_count` là số mẫu có API tương ứng trên tổng `n` mẫu;
-`repAPI` và `depAPI` giữ tỷ lệ (count / n). Ví dụ `repAPI_count: 17`, `n: 200`
-nghĩa là 17/200 mẫu. Một mẫu có thể được tính vào cả hai nhóm nếu sinh cả hai API.
+`repAPI` và `depAPI` là số nguyên: số mẫu có API tương ứng trên tổng `n` mẫu.
+Ví dụ `repAPI: 18`, `depAPI: 36`, `n: 200` nghĩa là 18/200 mẫu có repAPI và
+36/200 mẫu có depAPI. Không lưu tỷ lệ thập phân hay trường count trùng lặp.
+Một mẫu có thể được tính vào cả hai nhóm nếu sinh cả hai API.
 
 Trong `gate_scores.json`, mỗi record có `sample_index` (đánh số từ 0 trong tập test),
-`id` nếu dữ liệu có, `function`, `a`, `steering_scale`, `rep` và `dep`.
-`a` được lấy ngay từ hook trong lượt xử lý prompt đầu tiên; `steering_scale = a * t`.
-Baseline không chạy gate nên `a: null` và `steering_scale: 0.0`. Nếu hook không can thiệp
-(ví dụ prompt chỉ có một token), hai trường cũng có giá trị như vậy. Giá trị JSON
+`id` nếu dữ liệu có, `function`, `a`, `rep` và `dep`.
+Chỉ lưu hệ số gate `a`, lấy ngay từ hook trong lượt xử lý prompt đầu tiên.
+Hệ số steering thực tế là `a * t`, bằng `a` khi `t = 1`.
+Baseline không chạy gate nên `a: null`; nếu hook không can thiệp (ví dụ prompt chỉ có
+một token), `a` cũng là `null`. Giá trị JSON
 giữ độ chính xác của tensor, không làm tròn thành ba chữ số như log train.
 
 Con số cần đọc là **delta giữa `baseline` và `steered`**: repAPI phải tăng, depAPI phải giảm,

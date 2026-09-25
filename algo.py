@@ -235,7 +235,6 @@ def evaluate(model, tok, data, device, args, tag, hook):
                 "id": rec.get("id"),
                 "function": rec["function"],
                 "a": a,
-                "steering_scale": a * hook.t if a is not None else 0.0,
                 "rep": r,
                 "dep": d,
             }
@@ -253,15 +252,10 @@ def evaluate(model, tok, data, device, args, tag, hook):
     n = len(data)
     res = {
         "n": n,
-        "repAPI_count": rep_hits,
-        "depAPI_count": dep_hits,
-        "repAPI": rep_hits / n,
-        "depAPI": dep_hits / n,
+        "repAPI": rep_hits,
+        "depAPI": dep_hits,
     }
-    logger.info(
-        f"[{tag}] n={n}  repAPI={rep_hits}/{n} ({res['repAPI']:.3f})  "
-        f"depAPI={dep_hits}/{n} ({res['depAPI']:.3f})"
-    )
+    logger.info(f"[{tag}] n={n}  repAPI={rep_hits}/{n}  depAPI={dep_hits}/{n}")
     return res, samples, gate_scores
 
 

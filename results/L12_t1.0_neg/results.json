@@ -31,12 +31,12 @@
   },
   "D_test_U_nondep/baseline": {
     "n": 200,
-    "repAPI": 7,
-    "depAPI": 1
+    "repAPI": 14,
+    "depAPI": 0
   },
   "D_test_U_nondep/steered": {
     "n": 200,
-    "repAPI": 7,
-    "depAPI": 1
+    "repAPI": 8,
+    "depAPI": 10
   }
 }
